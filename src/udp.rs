@@ -31,7 +31,12 @@ impl<'a> UdpHeader<'a> {
     }
 
     pub fn payload(&self) -> &[u8] {
-        &self.data[UDP_HDR_LEN..]
+        let len = self.length() as usize;
+        if len >= UDP_HDR_LEN && len <= self.data.len() {
+            &self.data[UDP_HDR_LEN..len]
+        } else {
+            &self.data[UDP_HDR_LEN..]
+        }
     }
 
     pub fn write_header(
@@ -69,5 +74,25 @@ impl<'a> UdpHeader<'a> {
         let final_csum = if csum == 0 { 0xFFFF } else { csum };
 
         NetworkEndian::write_u16(&mut buf[6..8], final_csum);
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_udp_parsing() {
+        let mut data = [0u8; 16];
+        let src_ip = Ipv4Addr::new(192, 168, 1, 1);
+        let dest_ip = Ipv4Addr::new(192, 168, 1, 2);
+        let payload = b"hello!";
+        UdpHeader::write_header(&mut data, 1234, 5678, src_ip, dest_ip, payload);
+
+        let udp = UdpHeader::new(&data[..14]).unwrap();
+        assert_eq!(udp.src_port(), 1234);
+        assert_eq!(udp.dest_port(), 5678);
+        assert_eq!(udp.length(), 14);
+        assert_eq!(udp.payload(), payload);
     }
 }

@@ -4,13 +4,15 @@ mod engine;
 
 use aether::ethernet::{EthernetFrame, MacAddress, EtherType};
 use aether::ipv4::{Ipv4Packet, IpProtocol};
+use aether::ipv6::{Ipv6Packet, Ipv6NextHeader};
+use aether::icmpv6::{Icmpv6Packet, Icmpv6Type};
 use aether::tcp::{TcpHeader, TcpFlags, TcpState, TcpConnection};
 use aether::dhcp::{DhcpPacket, DhcpMessageType, DHCP_CLIENT_PORT, DHCP_SERVER_PORT};
 use aether::{arp, icmp, ipv4, tcp, utils, http, udp, dns, dhcp};
 
 use tap::TapDevice;
 use std::collections::HashMap;
-use std::net::Ipv4Addr;
+use std::net::{Ipv4Addr, Ipv6Addr};
 use std::time::{Instant, Duration};
 use byteorder::{ByteOrder, NetworkEndian};
 use std::thread;
@@ -18,6 +20,7 @@ use std::thread;
 // --- Configuration ---
 pub const LOG_ENABLED: bool = false;
 pub const STACK_MAC: MacAddress = MacAddress([0xDE, 0xAD, 0xBE, 0xEF, 0x00, 0x01]);
+pub const STACK_IP6: Ipv6Addr = Ipv6Addr::new(0xfe80, 0, 0, 0, 0, 0, 0, 1);
 pub const BATCH_SIZE: usize = 128;
 pub const MTU: usize = 1514;
 pub const GC_INTERVAL: u64 = 1;
@@ -59,6 +62,7 @@ pub struct ActiveConnection {
 
 pub fn process_packet(
     my_ip: Ipv4Addr,
+    my_ip6: Ipv6Addr,
     raw_data: &[u8],
     connections: &mut HashMap<(Ipv4Addr, u16, u16), ActiveConnection>,
                       out_buf: &mut [u8; MTU]
@@ -71,6 +75,43 @@ pub fn process_packet(
                         EthernetFrame::write_header(&mut out_buf[0..14], frame.source(), STACK_MAC, EtherType::ARP);
                         arp::ArpPacket::write_reply(&mut out_buf[14..42], STACK_MAC, my_ip, arp_pkt.sender_mac(), arp_pkt.sender_ip());
                         return 42;
+                    }
+                }
+            }
+            EtherType::IPv6 => {
+                if let Some(ip_pkt) = Ipv6Packet::new(frame.payload()) {
+                    if ip_pkt.dest_ip() == my_ip6 || ip_pkt.dest_ip().is_multicast() {
+                        match ip_pkt.next_header() {
+                            Ipv6NextHeader::ICMPv6 => {
+                                if let Some(icmp_pkt) = Icmpv6Packet::new(ip_pkt.payload()) {
+                                    match icmp_pkt.icmpv6_type() {
+                                        Icmpv6Type::EchoRequest => {
+                                            let payload = icmp_pkt.payload();
+                                            let len = 14 + 40 + 8 + payload.len();
+                                            EthernetFrame::write_header(&mut out_buf[0..14], frame.source(), STACK_MAC, EtherType::IPv6);
+                                            Ipv6Packet::write_header(&mut out_buf[14..54], my_ip6, ip_pkt.source_ip(), Ipv6NextHeader::ICMPv6, (8 + payload.len()) as u16);
+                                            Icmpv6Packet::write_echo_reply(&mut out_buf[54..], my_ip6, ip_pkt.source_ip(), NetworkEndian::read_u16(&icmp_pkt.data[4..6]), NetworkEndian::read_u16(&icmp_pkt.data[6..8]), payload);
+                                            return len;
+                                        }
+                                        Icmpv6Type::NeighborSolicitation => {
+                                            let target_ip_slice = &icmp_pkt.data[8..24];
+                                            let mut target_ip_bytes = [0u8; 16];
+                                            target_ip_bytes.copy_from_slice(target_ip_slice);
+                                            let target_ip = Ipv6Addr::from(target_ip_bytes);
+                                            
+                                            if target_ip == my_ip6 {
+                                                EthernetFrame::write_header(&mut out_buf[0..14], frame.source(), STACK_MAC, EtherType::IPv6);
+                                                Ipv6Packet::write_header(&mut out_buf[14..54], my_ip6, ip_pkt.source_ip(), Ipv6NextHeader::ICMPv6, 32);
+                                                Icmpv6Packet::write_neighbor_advertisement(&mut out_buf[54..], my_ip6, ip_pkt.source_ip(), my_ip6, STACK_MAC);
+                                                return 14 + 40 + 32;
+                                            }
+                                        }
+                                        _ => {}
+                                    }
+                                }
+                            }
+                            _ => {}
+                        }
                     }
                 }
             }
@@ -262,5 +303,44 @@ fn main() -> std::io::Result<()> {
         engine::run_multi_threaded(tap, my_ip, cores)
     } else {
         engine::run_single_threaded(tap, my_ip)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_process_packet_arp() {
+        let mut out_buf = [0u8; MTU];
+        let mut connections = HashMap::new();
+        let my_ip = Ipv4Addr::new(192, 168, 1, 2);
+        let my_ip6 = Ipv6Addr::new(0xfe80, 0, 0, 0, 0, 0, 0, 1);
+        
+        let mut in_buf = [0u8; 100];
+        let sender_mac = MacAddress([1, 2, 3, 4, 5, 6]);
+        let sender_ip = Ipv4Addr::new(192, 168, 1, 1);
+        EthernetFrame::write_header(&mut in_buf[0..14], STACK_MAC, sender_mac, EtherType::ARP);
+        
+        // ARP Request for my_ip
+        NetworkEndian::write_u16(&mut in_buf[14..16], 1); // HW Type
+        NetworkEndian::write_u16(&mut in_buf[16..18], 0x0800); // Proto Type
+        in_buf[18] = 6; in_buf[19] = 4; // Addr lens
+        NetworkEndian::write_u16(&mut in_buf[20..22], 1); // Op: Request
+        in_buf[22..28].copy_from_slice(&sender_mac.0);
+        in_buf[28..32].copy_from_slice(&sender_ip.octets());
+        in_buf[32..38].copy_from_slice(&[0u8; 6]);
+        in_buf[38..42].copy_from_slice(&my_ip.octets());
+
+        let len = process_packet(my_ip, my_ip6, &in_buf[..42], &mut connections, &mut out_buf);
+        assert_eq!(len, 42);
+        
+        let eth = EthernetFrame::new(&out_buf[..14]).unwrap();
+        assert_eq!(eth.ether_type(), EtherType::ARP);
+        assert_eq!(eth.destination(), sender_mac);
+        
+        let arp_resp = arp::ArpPacket::new(&out_buf[14..42]).unwrap();
+        assert_eq!(arp_resp.operation(), arp::ArpOp::Reply);
+        assert_eq!(arp_resp.target_ip(), sender_ip);
     }
 }

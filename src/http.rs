@@ -34,3 +34,22 @@ Some(response)
         None
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_http_handler() {
+        let request = b"GET /index.html HTTP/1.1\r\nHost: localhost\r\n\r\n";
+        let response = handle_request(request).unwrap();
+        assert!(response.contains("HTTP/1.1 200 OK"));
+        assert!(response.contains("Project Aether"));
+    }
+
+    #[test]
+    fn test_http_invalid() {
+        let request = b"POST /submit HTTP/1.1\r\n\r\n";
+        assert!(handle_request(request).is_none());
+    }
+}

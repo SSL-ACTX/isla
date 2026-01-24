@@ -111,3 +111,21 @@ impl<'a> DhcpPacket<'a> {
         idx
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_dhcp_build_and_parse() {
+        let mut buf = [0u8; 512];
+        let mac = MacAddress([0x01, 0x02, 0x03, 0x04, 0x05, 0x06]);
+        let xid = 0x12345678;
+        let len = DhcpPacket::build_packet(&mut buf, 1, xid, mac, DhcpMessageType::Discover, None);
+
+        let packet = DhcpPacket::new(&buf[..len]).unwrap();
+        assert_eq!(packet.op(), 1);
+        assert_eq!(packet.xid(), xid);
+        assert_eq!(packet.message_type(), DhcpMessageType::Discover);
+    }
+}

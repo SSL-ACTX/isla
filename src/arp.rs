@@ -86,3 +86,26 @@ impl<'a> ArpPacket<'a> {
         buf[24..28].copy_from_slice(&target_ip.octets());
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_arp_parsing() {
+        let mut data = [0u8; 28];
+        let sender_mac = MacAddress([0x01, 0x02, 0x03, 0x04, 0x05, 0x06]);
+        let sender_ip = Ipv4Addr::new(192, 168, 1, 1);
+        let target_mac = MacAddress([0x07, 0x08, 0x09, 0x0a, 0x0b, 0x0c]);
+        let target_ip = Ipv4Addr::new(192, 168, 1, 2);
+
+        ArpPacket::write_reply(&mut data, sender_mac, sender_ip, target_mac, target_ip);
+
+        let packet = ArpPacket::new(&data).unwrap();
+        assert_eq!(packet.operation(), ArpOp::Reply);
+        assert_eq!(packet.sender_mac(), sender_mac);
+        assert_eq!(packet.sender_ip(), sender_ip);
+        assert_eq!(packet.target_mac(), target_mac);
+        assert_eq!(packet.target_ip(), target_ip);
+    }
+}

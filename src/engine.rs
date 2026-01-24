@@ -7,9 +7,10 @@ use std::thread;
 use std::hint;
 use crate::tap::TapDevice;
 use crate::Packet;
-use crate::{process_packet, ActiveConnection, BATCH_SIZE, MTU, GC_INTERVAL, TCP_TIMEOUT, log};
+use crate::{process_packet, ActiveConnection, BATCH_SIZE, MTU, GC_INTERVAL, TCP_TIMEOUT, log, STACK_IP6};
 use aether::ethernet::{EthernetFrame, EtherType};
 use aether::ipv4::Ipv4Packet;
+use aether::ipv6::Ipv6Packet;
 use aether::ipv4::IpProtocol;
 use byteorder::{ByteOrder, NetworkEndian};
 
@@ -65,7 +66,7 @@ pub fn run_single_threaded(mut tap: TapDevice, my_ip: Ipv4Addr) -> std::io::Resu
         for i in 0..BATCH_SIZE {
             match tap.read(&mut rx_batch[i]) {
                 Ok(n) => {
-                    let len = process_packet(my_ip, &rx_batch[i][..n], &mut connections, &mut temp_tx_buf);
+                    let len = process_packet(my_ip, STACK_IP6, &rx_batch[i][..n], &mut connections, &mut temp_tx_buf);
                     if len > 0 {
                         tx_queue[tx_count].len = len;
                         tx_queue[tx_count].data[..len].copy_from_slice(&temp_tx_buf[..len]);
@@ -100,7 +101,7 @@ pub fn run_multi_threaded(mut tap: TapDevice, my_ip: Ipv4Addr, num_workers: usiz
     let (tx_collector, rx_collector) = mpsc::channel::<Packet>();
     let mut worker_senders = Vec::with_capacity(num_workers);
 
-    for i in 0..num_workers {
+    for _i in 0..num_workers {
         let (tx_dispatch, rx_dispatch) = mpsc::channel::<Packet>();
         worker_senders.push(tx_dispatch);
         let tx_out = tx_collector.clone();
@@ -113,7 +114,7 @@ pub fn run_multi_threaded(mut tap: TapDevice, my_ip: Ipv4Addr, num_workers: usiz
             loop {
                 match rx_dispatch.recv() {
                     Ok(pkt) => {
-                        let len = process_packet(my_ip, &pkt.data[..pkt.len], &mut connections, &mut out_buf);
+                        let len = process_packet(my_ip, STACK_IP6, &pkt.data[..pkt.len], &mut connections, &mut out_buf);
                         if len > 0 {
                             let mut resp = Packet::new();
                             resp.len = len;
@@ -145,15 +146,25 @@ pub fn run_multi_threaded(mut tap: TapDevice, my_ip: Ipv4Addr, num_workers: usiz
                     let mut worker_id = 0;
 
                     if let Some(frame) = EthernetFrame::new(pkt_data) {
-                        if frame.ether_type() == EtherType::IPv4 {
-                            if let Some(ip) = Ipv4Packet::new(frame.payload()) {
-                                let src = ip.source_ip().octets();
-                                let mut hash: usize = (src[3] as usize) << 8 | (src[2] as usize);
-                                if ip.protocol() == IpProtocol::TCP && ip.payload().len() >= 2 {
-                                    hash ^= NetworkEndian::read_u16(&ip.payload()[0..2]) as usize;
+                        match frame.ether_type() {
+                            EtherType::IPv4 => {
+                                if let Some(ip) = Ipv4Packet::new(frame.payload()) {
+                                    let src = ip.source_ip().octets();
+                                    let mut hash: usize = (src[3] as usize) << 8 | (src[2] as usize);
+                                    if ip.protocol() == IpProtocol::TCP && ip.payload().len() >= 2 {
+                                        hash ^= NetworkEndian::read_u16(&ip.payload()[0..2]) as usize;
+                                    }
+                                    worker_id = hash % num_workers;
                                 }
-                                worker_id = hash % num_workers;
                             }
+                            EtherType::IPv6 => {
+                                if let Some(ip) = Ipv6Packet::new(frame.payload()) {
+                                    let src = ip.source_ip().octets();
+                                    let hash: usize = src.iter().fold(0usize, |acc, &x| acc.wrapping_add(x as usize));
+                                    worker_id = hash % num_workers;
+                                }
+                            }
+                            _ => {}
                         }
                     }
 

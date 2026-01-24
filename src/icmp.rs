@@ -55,3 +55,19 @@ impl<'a> IcmpPacket<'a> {
         NetworkEndian::write_u16(&mut buf[2..4], csum);
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_icmp_parsing() {
+        let mut data = [0u8; 12];
+        let payload = b"ping";
+        IcmpPacket::write_echo_reply(&mut data, 0x1234, 0x5678, payload);
+
+        let packet = IcmpPacket::new(&data).unwrap();
+        assert_eq!(packet.icmp_type(), IcmpType::EchoReply);
+        assert_eq!(packet.payload(), payload);
+    }
+}

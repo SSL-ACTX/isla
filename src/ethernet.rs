@@ -97,3 +97,21 @@ impl<'a> EthernetFrame<'a> {
         NetworkEndian::write_u16(&mut buf[12..14], eth_type.into());
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_ethernet_parsing() {
+        let mut data = [0u8; 14];
+        let dest = MacAddress([0x01, 0x23, 0x45, 0x67, 0x89, 0xab]);
+        let src = MacAddress([0xcd, 0xef, 0x01, 0x23, 0x45, 0x67]);
+        EthernetFrame::write_header(&mut data, dest, src, EtherType::IPv4);
+
+        let frame = EthernetFrame::new(&data).unwrap();
+        assert_eq!(frame.destination(), dest);
+        assert_eq!(frame.source(), src);
+        assert_eq!(frame.ether_type(), EtherType::IPv4);
+    }
+}

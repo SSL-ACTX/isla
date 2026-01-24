@@ -96,3 +96,38 @@ pub fn generate_syn_cookie(
     // We truncate the 64-bit hash to 32 bits for the Sequence Number
     hasher.finish() as u32
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_checksum() {
+        let data = [0x45, 0x00, 0x00, 0x3d, 0x00, 0x00, 0x40, 0x00, 0x40, 0x01, 0x00, 0x00, 0xc0, 0xa8, 0x01, 0x01, 0xc0, 0xa8, 0x01, 0x02];
+        let csum = checksum(&data);
+        assert_ne!(csum, 0);
+        
+        // If we write the checksum back, the new checksum should be 0 (RFC 1071)
+        // Note: checksum returns the one's complement.
+        let mut data_with_csum = data;
+        NetworkEndian::write_u16(&mut data_with_csum[10..12], csum);
+        assert_eq!(checksum(&data_with_csum), 0);
+    }
+
+    #[test]
+    fn test_jenkins_hash() {
+        let mut h1 = JenkinsHasher::new();
+        h1.write(b"aether");
+        let res1 = h1.finish();
+
+        let mut h2 = JenkinsHasher::new();
+        h2.write(b"aether");
+        let res2 = h2.finish();
+
+        assert_eq!(res1, res2);
+
+        let mut h3 = JenkinsHasher::new();
+        h3.write(b"other");
+        assert_ne!(res1, h3.finish());
+    }
+}

@@ -89,3 +89,22 @@ impl<'a> Ipv4Packet<'a> {
         NetworkEndian::write_u16(&mut buf[10..12], csum);
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_ipv4_parsing() {
+        let mut data = [0u8; 20];
+        let src = Ipv4Addr::new(192, 168, 1, 1);
+        let dest = Ipv4Addr::new(192, 168, 1, 2);
+        Ipv4Packet::write_header(&mut data, src, dest, IpProtocol::TCP, 100);
+
+        let packet = Ipv4Packet::new(&data).unwrap();
+        assert_eq!(packet.source_ip(), src);
+        assert_eq!(packet.dest_ip(), dest);
+        assert_eq!(packet.protocol(), IpProtocol::TCP);
+        assert_eq!(packet.header_length(), 20);
+    }
+}

@@ -81,3 +81,23 @@ pub fn parse_response(data: &[u8]) -> Option<String> {
     }
     None
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_dns_encoding() {
+        let name = "google.com";
+        let encoded = DnsQuery::encode_name(name);
+        assert_eq!(encoded, b"\x06google\x03com\x00");
+    }
+
+    #[test]
+    fn test_dns_query_build() {
+        let query = DnsQuery::new(0x1234);
+        let packet = query.build_query("example.com");
+        assert_eq!(NetworkEndian::read_u16(&packet[0..2]), 0x1234);
+        assert_eq!(NetworkEndian::read_u16(&packet[2..4]), 0x0100);
+    }
+}

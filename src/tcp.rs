@@ -87,3 +87,23 @@ pub struct TcpConnection {
     pub local_seq: u32,
     pub remote_seq: u32,
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_tcp_parsing() {
+        let mut data = [0u8; 20];
+        let src_ip = Ipv4Addr::new(192, 168, 1, 1);
+        let dest_ip = Ipv4Addr::new(192, 168, 1, 2);
+        TcpHeader::write_header(&mut data, 1234, 5678, 100, 200, TcpFlags::SYN | TcpFlags::ACK, src_ip, dest_ip, 0);
+
+        let tcp = TcpHeader::new(&data).unwrap();
+        assert_eq!(tcp.src_port(), 1234);
+        assert_eq!(tcp.dest_port(), 5678);
+        assert_eq!(tcp.seq_num(), 100);
+        assert_eq!(tcp.ack_num(), 200);
+        assert_eq!(tcp.flags(), TcpFlags::SYN | TcpFlags::ACK);
+    }
+}
