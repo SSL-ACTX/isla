@@ -5,7 +5,7 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg?style=for-the-badge&logo=open-source-initiative)](https://opensource.org/licenses/MIT)
 [![Language](https://img.shields.io/badge/Rust-Latest-orange.svg?style=for-the-badge&logo=rust)](https://www.rust-lang.org/)
 [![Status](https://img.shields.io/badge/Status-Experimental%20Prototype-red.svg?style=for-the-badge)]()
-[![IPv6](https://img.shields.io/badge/IPv6-Not%20Supported-critical.svg?style=for-the-badge)]()
+[![IPv6](https://img.shields.io/badge/IPv6-Supported-green.svg?style=for-the-badge)]()
 
 </div>
 
@@ -30,8 +30,8 @@ The goal of this project was to explore the mechanics of the TCP 3-way handshake
 
 If you are looking for a usable TCP/IP stack for your Rust OS or embedded project, **this is probably not it**. Aether takes significant shortcuts to achieve high "benchmark" numbers on local connections:
 
-### 1. No IPv6 Support
-Aether is strictly **IPv4-only**. In an era where IPv6 is mandatory for general compliance, this stack is stuck in the past.
+### 1. IPv6 Support
+Aether now supports **IPv6 core logic**, including ICMPv6 and the Neighbor Discovery Protocol (NDP). This allows the stack to resolve Layer 2 addresses and respond to pings in modern IPv6-enabled environments.
 
 ### 2. Zero Reliability Mechanisms
 To keep the engine extremely fast, we stripped out the safety features that make TCP "reliable":
@@ -72,13 +72,15 @@ Despite its limitations, Aether successfully implements enough of the protocol s
 | Layer | Protocol | Status | Notes |
 | :--- | :--- | :--- | :--- |
 | **L2** | **Ethernet** | ✅ | Frame parsing, broadcast handling |
-| **L2** | **ARP** | ✅ | Request & Reply (Hardware Address Resolution) |
-| **L3** | **IPv4** | ⚠️ | Header validation only (No frag, options, or TTL processing) |
+| **L2** | **ARP** | ✅ | Request & Reply (IPv4 L2 resolution) |
+| **L3** | **IPv4** | ⚠️ | Header validation only (No frag/options) |
+| **L3** | **IPv6** | ✅ | Core parsing, Hop Limits, Multicast-aware |
 | **L3** | **ICMP** | ✅ | Echo Request/Reply (Ping) |
-| **L4** | **TCP** | ⚠️ | 3-Way Handshake, PSH, FIN, RST (No Re-Tx, SACK, Window Scale) |
-| **L4** | **UDP** | ✅ | Basic datagram parsing |
+| **L3** | **ICMPv6** | ✅ | Echo Reply, NDP (Neighbor Solicitation/Adv) |
+| **L4** | **TCP** | ⚠️ | 3-Way Handshake, PSH, FIN, RST (No Re-Tx) |
+| **L4** | **UDP** | ✅ | Pseudo-header checksum validation |
 | **L7** | **DHCP** | ✅ | DORA Sequence (Discover, Offer, Request, Ack) |
-| **L7** | **DNS** | ❌ | Parsing stub only (No resolution logic) |
+| **L7** | **DNS** | ✅ | Basic A-Record Query building & parsing |
 | **L7** | **HTTP** | ⚠️ | Static HTML responder (GET / only) |
 
 ---
@@ -94,6 +96,16 @@ Running on a single-core **Intel Celeron 900 (2.2GHz, 2009)** context:
 | **Concurrency** | 100 Concurrent | Validated with Python stress script |
 
 *Note: These numbers represent raw packet processing speed in a controlled environment. Real-world performance over a physical NIC would be significantly lower due to the lack of congestion control.*
+
+---
+
+## 🧪 Testing & Reliability
+
+To ensure correctness in a `no_std` environment, Aether maintains a strict testing suite:
+
+*   **Comprehensive Unit Tests:** Every module (`arp`, `ipv6`, `icmpv6`, `tcp`, `udp`, `dhcp`, `dns`, etc.) features integrated unit tests covering packet parsing, checksum calculation, and state transitions.
+*   **Integration Testing:** A custom Python suite (`test_stack.py`) validates the stack against real-world scenarios including HTTP compliance, UDP integrity, and concurrent stress.
+*   **Zero-Allocation Paths:** Critical packet processing paths are optimized for zero `alloc` usage when possible.
 
 ---
 
