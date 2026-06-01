@@ -1,5 +1,5 @@
 [package]
-name = "aether"
+name = "isla"
 version = "0.1.0"
 edition = "2021"
 
@@ -9,7 +9,7 @@ libc = "0.2"
 nix = "0.27"
 
 [lib]
-name = "aether"
+name = "isla"
 path = "src/lib.rs"
 
 [profile.release]

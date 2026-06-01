@@ -1,7 +1,7 @@
 // src/dhcp.rs
+use crate::ethernet::MacAddress;
 use byteorder::{ByteOrder, NetworkEndian};
 use core::net::Ipv4Addr;
-use crate::ethernet::MacAddress;
 
 pub const DHCP_SERVER_PORT: u16 = 67;
 pub const DHCP_CLIENT_PORT: u16 = 68;
@@ -23,12 +23,18 @@ pub struct DhcpPacket<'a> {
 impl<'a> DhcpPacket<'a> {
     pub fn new(data: &'a [u8]) -> Option<Self> {
         // Minimum size of fixed header
-        if data.len() < 240 { return None; }
+        if data.len() < 240 {
+            return None;
+        }
         Some(Self { data })
     }
 
-    pub fn op(&self) -> u8 { self.data[0] }
-    pub fn xid(&self) -> u32 { NetworkEndian::read_u32(&self.data[4..8]) }
+    pub fn op(&self) -> u8 {
+        self.data[0]
+    }
+    pub fn xid(&self) -> u32 {
+        NetworkEndian::read_u32(&self.data[4..8])
+    }
     pub fn your_ip(&self) -> Ipv4Addr {
         let mut oct = [0u8; 4];
         oct.copy_from_slice(&self.data[16..20]);
@@ -40,12 +46,17 @@ impl<'a> DhcpPacket<'a> {
         let mut idx = 240; // Skip header + cookie
         while idx < self.data.len() {
             let tag = self.data[idx];
-            if tag == 255 { break; } // End option
-            if tag == 0 { idx += 1; continue; } // Pad option
+            if tag == 255 {
+                break;
+            } // End option
+            if tag == 0 {
+                idx += 1;
+                continue;
+            } // Pad option
 
-            let len = self.data[idx+1] as usize;
+            let len = self.data[idx + 1] as usize;
             if tag == 53 && len == 1 {
-                return match self.data[idx+2] {
+                return match self.data[idx + 2] {
                     1 => DhcpMessageType::Discover,
                     2 => DhcpMessageType::Offer,
                     3 => DhcpMessageType::Request,
@@ -61,8 +72,8 @@ impl<'a> DhcpPacket<'a> {
     /// Helper to write a DHCP Header + Options
     pub fn build_packet(
         buf: &mut [u8],
-        op: u8,            // 1 = Request, 2 = Reply
-        xid: u32,          // Transaction ID
+        op: u8,   // 1 = Request, 2 = Reply
+        xid: u32, // Transaction ID
         mac: MacAddress,
         msg_type: DhcpMessageType,
         req_ip: Option<Ipv4Addr>, // If requesting a specific IP
@@ -87,21 +98,25 @@ impl<'a> DhcpPacket<'a> {
         let mut idx = 240;
 
         // Option 53: Message Type
-        buf[idx] = 53; buf[idx+1] = 1; buf[idx+2] = msg_type as u8;
+        buf[idx] = 53;
+        buf[idx + 1] = 1;
+        buf[idx + 2] = msg_type as u8;
         idx += 3;
 
         // Option 50: Requested IP (used in Request)
         if let Some(ip) = req_ip {
-            buf[idx] = 50; buf[idx+1] = 4;
-            buf[idx+2..idx+6].copy_from_slice(&ip.octets());
+            buf[idx] = 50;
+            buf[idx + 1] = 4;
+            buf[idx + 2..idx + 6].copy_from_slice(&ip.octets());
             idx += 6;
         }
 
         // Option 55: Parameter Request List (Subnet Mask, Router, DNS)
-        buf[idx] = 55; buf[idx+1] = 3;
-        buf[idx+2] = 1;  // Subnet Mask
-        buf[idx+3] = 3;  // Router
-        buf[idx+4] = 6;  // DNS Server
+        buf[idx] = 55;
+        buf[idx + 1] = 3;
+        buf[idx + 2] = 1; // Subnet Mask
+        buf[idx + 3] = 3; // Router
+        buf[idx + 4] = 6; // DNS Server
         idx += 5;
 
         // Option 255: End

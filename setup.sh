@@ -2,10 +2,10 @@
 set -e
 
 # --- Configuration ---
-INTERFACE="aether0"
+INTERFACE="isla0"
 HOST_IP="192.168.1.1/24"
 HOST_MAC="00:11:22:33:44:55"
-PROJECT_NAME="aether"
+PROJECT_NAME="isla"
 
 # --- Argument Parsing ---
 MODE="release"
@@ -21,7 +21,7 @@ fi
 BINARY="./target/$TARGET_DIR/$PROJECT_NAME"
 
 echo "========================================"
-echo "   Project Aether: Environment Setup"
+echo "   Project Isla: Environment Setup"
 echo "   Mode: $MODE"
 echo "========================================"
 
@@ -83,7 +83,7 @@ else
 fi
 
 echo "========================================"
-echo "   Aether Stack Launching..."
+echo "   Isla Stack Launching..."
 echo "   (Ctrl+C to stop and cleanup)"
 echo "========================================"
 

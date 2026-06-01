@@ -86,12 +86,7 @@ impl<'a> EthernetFrame<'a> {
     }
 
     /// Helper to write an ethernet header into a buffer
-    pub fn write_header(
-        buf: &mut [u8],
-        dest: MacAddress,
-        src: MacAddress,
-        eth_type: EtherType,
-    ) {
+    pub fn write_header(buf: &mut [u8], dest: MacAddress, src: MacAddress, eth_type: EtherType) {
         buf[0..6].copy_from_slice(&dest.0);
         buf[6..12].copy_from_slice(&src.0);
         NetworkEndian::write_u16(&mut buf[12..14], eth_type.into());

@@ -1,6 +1,6 @@
 // src/ipv6.rs
-use core::net::Ipv6Addr;
 use byteorder::{ByteOrder, NetworkEndian};
+use core::net::Ipv6Addr;
 
 pub const IPV6_HDR_LEN: usize = 40;
 
@@ -85,7 +85,7 @@ impl<'a> Ipv6Packet<'a> {
         buf[1] = 0x00;
         buf[2] = 0x00;
         buf[3] = 0x00;
-        
+
         NetworkEndian::write_u16(&mut buf[4..6], payload_len);
         buf[6] = match next_header {
             Ipv6NextHeader::ICMPv6 => 58,
@@ -94,7 +94,7 @@ impl<'a> Ipv6Packet<'a> {
             Ipv6NextHeader::Unknown(p) => p,
         };
         buf[7] = 64; // Hop Limit
-        
+
         buf[8..24].copy_from_slice(&src_ip.octets());
         buf[24..40].copy_from_slice(&dest_ip.octets());
     }
@@ -110,7 +110,7 @@ mod tests {
         let src = Ipv6Addr::new(0xfe80, 0, 0, 0, 0, 0, 0, 1);
         let dest = Ipv6Addr::new(0xfe80, 0, 0, 0, 0, 0, 0, 2);
         Ipv6Packet::write_header(&mut data, src, dest, Ipv6NextHeader::TCP, 100);
-        
+
         let packet = Ipv6Packet::new(&data).unwrap();
         assert_eq!(packet.source_ip(), src);
         assert_eq!(packet.dest_ip(), dest);

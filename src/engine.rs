@@ -1,18 +1,20 @@
 // src/engine.rs
-use std::collections::HashMap;
-use std::net::Ipv4Addr;
-use std::time::{Instant, Duration};
-use std::sync::mpsc::{self, TryRecvError};
-use std::thread;
-use std::hint;
 use crate::tap::TapDevice;
 use crate::Packet;
-use crate::{process_packet, ActiveConnection, BATCH_SIZE, MTU, GC_INTERVAL, TCP_TIMEOUT, log, STACK_IP6};
-use aether::ethernet::{EthernetFrame, EtherType};
-use aether::ipv4::Ipv4Packet;
-use aether::ipv6::Ipv6Packet;
-use aether::ipv4::IpProtocol;
+use crate::{
+    log, process_packet, ActiveConnection, BATCH_SIZE, GC_INTERVAL, MTU, STACK_IP6, TCP_TIMEOUT,
+};
 use byteorder::{ByteOrder, NetworkEndian};
+use isla::ethernet::{EtherType, EthernetFrame};
+use isla::ipv4::IpProtocol;
+use isla::ipv4::Ipv4Packet;
+use isla::ipv6::Ipv6Packet;
+use std::collections::HashMap;
+use std::hint;
+use std::net::Ipv4Addr;
+use std::sync::mpsc::{self, TryRecvError};
+use std::thread;
+use std::time::{Duration, Instant};
 
 pub struct AdaptiveBackoff {
     idle_cycles: u32,
@@ -53,7 +55,8 @@ pub fn run_single_threaded(mut tap: TapDevice, my_ip: Ipv4Addr) -> std::io::Resu
     log!("[ENGINE] Mode: SINGLE-THREADED (Adaptive Backoff Enabled)");
 
     let mut rx_batch: [[u8; MTU]; BATCH_SIZE] = [[0u8; MTU]; BATCH_SIZE];
-    let mut connections: HashMap<(Ipv4Addr, u16, u16), ActiveConnection> = HashMap::with_capacity(1024);
+    let mut connections: HashMap<(Ipv4Addr, u16, u16), ActiveConnection> =
+        HashMap::with_capacity(1024);
     let mut temp_tx_buf = [0u8; MTU];
     let mut tx_queue: Vec<Packet> = vec![Packet::new(); BATCH_SIZE];
     let mut last_gc = Instant::now();
@@ -66,14 +69,20 @@ pub fn run_single_threaded(mut tap: TapDevice, my_ip: Ipv4Addr) -> std::io::Resu
         for i in 0..BATCH_SIZE {
             match tap.read(&mut rx_batch[i]) {
                 Ok(n) => {
-                    let len = process_packet(my_ip, STACK_IP6, &rx_batch[i][..n], &mut connections, &mut temp_tx_buf);
+                    let len = process_packet(
+                        my_ip,
+                        STACK_IP6,
+                        &rx_batch[i][..n],
+                        &mut connections,
+                        &mut temp_tx_buf,
+                    );
                     if len > 0 {
                         tx_queue[tx_count].len = len;
                         tx_queue[tx_count].data[..len].copy_from_slice(&temp_tx_buf[..len]);
                         tx_count += 1;
                     }
                     packets_processed += 1;
-                },
+                }
                 Err(e) if e.kind() == std::io::ErrorKind::WouldBlock => break,
                 Err(_) => break,
             }
@@ -95,7 +104,11 @@ pub fn run_single_threaded(mut tap: TapDevice, my_ip: Ipv4Addr) -> std::io::Resu
     }
 }
 
-pub fn run_multi_threaded(mut tap: TapDevice, my_ip: Ipv4Addr, num_workers: usize) -> std::io::Result<()> {
+pub fn run_multi_threaded(
+    mut tap: TapDevice,
+    my_ip: Ipv4Addr,
+    num_workers: usize,
+) -> std::io::Result<()> {
     log!("[ENGINE] Mode: MULTI-THREADED (Workers: {})", num_workers);
 
     let (tx_collector, rx_collector) = mpsc::channel::<Packet>();
@@ -114,7 +127,13 @@ pub fn run_multi_threaded(mut tap: TapDevice, my_ip: Ipv4Addr, num_workers: usiz
             loop {
                 match rx_dispatch.recv() {
                     Ok(pkt) => {
-                        let len = process_packet(my_ip, STACK_IP6, &pkt.data[..pkt.len], &mut connections, &mut out_buf);
+                        let len = process_packet(
+                            my_ip,
+                            STACK_IP6,
+                            &pkt.data[..pkt.len],
+                            &mut connections,
+                            &mut out_buf,
+                        );
                         if len > 0 {
                             let mut resp = Packet::new();
                             resp.len = len;
@@ -122,10 +141,12 @@ pub fn run_multi_threaded(mut tap: TapDevice, my_ip: Ipv4Addr, num_workers: usiz
                             let _ = tx_out.send(resp);
                         }
                         if last_gc.elapsed() > Duration::from_secs(GC_INTERVAL) {
-                            connections.retain(|_, v| v.last_seen.elapsed() < Duration::from_secs(TCP_TIMEOUT));
+                            connections.retain(|_, v| {
+                                v.last_seen.elapsed() < Duration::from_secs(TCP_TIMEOUT)
+                            });
                             last_gc = Instant::now();
                         }
-                    },
+                    }
                     Err(_) => break,
                 }
             }
@@ -150,9 +171,11 @@ pub fn run_multi_threaded(mut tap: TapDevice, my_ip: Ipv4Addr, num_workers: usiz
                             EtherType::IPv4 => {
                                 if let Some(ip) = Ipv4Packet::new(frame.payload()) {
                                     let src = ip.source_ip().octets();
-                                    let mut hash: usize = (src[3] as usize) << 8 | (src[2] as usize);
+                                    let mut hash: usize =
+                                        (src[3] as usize) << 8 | (src[2] as usize);
                                     if ip.protocol() == IpProtocol::TCP && ip.payload().len() >= 2 {
-                                        hash ^= NetworkEndian::read_u16(&ip.payload()[0..2]) as usize;
+                                        hash ^=
+                                            NetworkEndian::read_u16(&ip.payload()[0..2]) as usize;
                                     }
                                     worker_id = hash % num_workers;
                                 }
@@ -160,7 +183,9 @@ pub fn run_multi_threaded(mut tap: TapDevice, my_ip: Ipv4Addr, num_workers: usiz
                             EtherType::IPv6 => {
                                 if let Some(ip) = Ipv6Packet::new(frame.payload()) {
                                     let src = ip.source_ip().octets();
-                                    let hash: usize = src.iter().fold(0usize, |acc, &x| acc.wrapping_add(x as usize));
+                                    let hash: usize = src
+                                        .iter()
+                                        .fold(0usize, |acc, &x| acc.wrapping_add(x as usize));
                                     worker_id = hash % num_workers;
                                 }
                             }
@@ -170,7 +195,7 @@ pub fn run_multi_threaded(mut tap: TapDevice, my_ip: Ipv4Addr, num_workers: usiz
 
                     let _ = worker_senders[worker_id].send(Packet::from_slice(pkt_data));
                     packets_processed += 1;
-                },
+                }
                 Err(e) if e.kind() == std::io::ErrorKind::WouldBlock => break,
                 Err(_) => break,
             }
@@ -181,7 +206,7 @@ pub fn run_multi_threaded(mut tap: TapDevice, my_ip: Ipv4Addr, num_workers: usiz
                 Ok(resp) => {
                     let _ = tap.write(&resp.data[..resp.len]);
                     packets_processed += 1;
-                },
+                }
                 Err(TryRecvError::Empty) => break,
                 Err(TryRecvError::Disconnected) => return Ok(()),
             }

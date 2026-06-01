@@ -1,8 +1,8 @@
 // src/udp.rs
 use crate::utils::checksum;
+use alloc::vec::Vec;
 use byteorder::{ByteOrder, NetworkEndian};
 use core::net::Ipv4Addr;
-use alloc::vec::Vec;
 
 pub const UDP_HDR_LEN: usize = 8;
 
@@ -56,7 +56,7 @@ impl<'a> UdpHeader<'a> {
         buf[7] = 0;
 
         // Copy payload immediately so checksum covers it
-        buf[8..8+payload.len()].copy_from_slice(payload);
+        buf[8..8 + payload.len()].copy_from_slice(payload);
 
         // Calculate UDP Pseudo-Header Checksum
         let mut pseudo_header = Vec::with_capacity(12 + total_len);

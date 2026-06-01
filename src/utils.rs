@@ -1,7 +1,7 @@
 // src/utils.rs
 use byteorder::{ByteOrder, NetworkEndian};
-use core::net::Ipv4Addr;
 use core::hash::Hasher;
+use core::net::Ipv4Addr;
 
 // In a real stack, this should be a random value generated at startup.
 const SECRET_KEY: u64 = 0xDEAD_BEEF_CAFE_BABE;
@@ -34,8 +34,8 @@ pub fn tcp_checksum(src_ip: Ipv4Addr, dest_ip: Ipv4Addr, tcp_data: &[u8]) -> u16
 
     pseudo_header.extend_from_slice(&src_ip.octets());
     pseudo_header.extend_from_slice(&dest_ip.octets());
-    pseudo_header.push(0);  // Reserved
-    pseudo_header.push(6);  // Protocol TCP
+    pseudo_header.push(0); // Reserved
+    pseudo_header.push(6); // Protocol TCP
 
     let mut len_buf = [0u8; 2];
     NetworkEndian::write_u16(&mut len_buf, tcp_data.len() as u16);
@@ -83,7 +83,7 @@ pub fn generate_syn_cookie(
     src_port: u16,
     dest_ip: Ipv4Addr,
     dest_port: u16,
-    client_isn: u32
+    client_isn: u32,
 ) -> u32 {
     let mut hasher = JenkinsHasher::new();
     hasher.write(&src_ip.octets());
@@ -103,10 +103,13 @@ mod tests {
 
     #[test]
     fn test_checksum() {
-        let data = [0x45, 0x00, 0x00, 0x3d, 0x00, 0x00, 0x40, 0x00, 0x40, 0x01, 0x00, 0x00, 0xc0, 0xa8, 0x01, 0x01, 0xc0, 0xa8, 0x01, 0x02];
+        let data = [
+            0x45, 0x00, 0x00, 0x3d, 0x00, 0x00, 0x40, 0x00, 0x40, 0x01, 0x00, 0x00, 0xc0, 0xa8,
+            0x01, 0x01, 0xc0, 0xa8, 0x01, 0x02,
+        ];
         let csum = checksum(&data);
         assert_ne!(csum, 0);
-        
+
         // If we write the checksum back, the new checksum should be 0 (RFC 1071)
         // Note: checksum returns the one's complement.
         let mut data_with_csum = data;
@@ -117,11 +120,11 @@ mod tests {
     #[test]
     fn test_jenkins_hash() {
         let mut h1 = JenkinsHasher::new();
-        h1.write(b"aether");
+        h1.write(b"isla");
         let res1 = h1.finish();
 
         let mut h2 = JenkinsHasher::new();
-        h2.write(b"aether");
+        h2.write(b"isla");
         let res2 = h2.finish();
 
         assert_eq!(res1, res2);

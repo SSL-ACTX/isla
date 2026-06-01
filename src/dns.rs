@@ -1,7 +1,7 @@
 // src/dns.rs
-use byteorder::{ByteOrder, NetworkEndian};
-use alloc::vec::Vec;
 use alloc::string::String;
+use alloc::vec::Vec;
+use byteorder::{ByteOrder, NetworkEndian};
 
 pub struct DnsQuery {
     pub transaction_id: u16,
@@ -71,7 +71,9 @@ impl DnsQuery {
 
 pub fn parse_response(data: &[u8]) -> Option<String> {
     // Very naive parser. Just checks if it's a response to us.
-    if data.len() < 12 { return None; }
+    if data.len() < 12 {
+        return None;
+    }
 
     // Check if it's a response (QR bit set)
     // Flags are at bytes 2..4

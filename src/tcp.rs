@@ -28,15 +28,27 @@ pub struct TcpHeader<'a> {
 
 impl<'a> TcpHeader<'a> {
     pub fn new(data: &'a [u8]) -> Option<Self> {
-        if data.len() < TCP_HDR_LEN { return None; }
+        if data.len() < TCP_HDR_LEN {
+            return None;
+        }
         Some(Self { data })
     }
 
-    pub fn src_port(&self) -> u16 { NetworkEndian::read_u16(&self.data[0..2]) }
-    pub fn dest_port(&self) -> u16 { NetworkEndian::read_u16(&self.data[2..4]) }
-    pub fn seq_num(&self) -> u32 { NetworkEndian::read_u32(&self.data[4..8]) }
-    pub fn ack_num(&self) -> u32 { NetworkEndian::read_u32(&self.data[8..12]) }
-    pub fn flags(&self) -> u8 { self.data[13] }
+    pub fn src_port(&self) -> u16 {
+        NetworkEndian::read_u16(&self.data[0..2])
+    }
+    pub fn dest_port(&self) -> u16 {
+        NetworkEndian::read_u16(&self.data[2..4])
+    }
+    pub fn seq_num(&self) -> u32 {
+        NetworkEndian::read_u32(&self.data[4..8])
+    }
+    pub fn ack_num(&self) -> u32 {
+        NetworkEndian::read_u32(&self.data[8..12])
+    }
+    pub fn flags(&self) -> u8 {
+        self.data[13]
+    }
 
     pub fn data_offset(&self) -> usize {
         ((self.data[12] >> 4) as usize) * 4
@@ -97,7 +109,17 @@ mod tests {
         let mut data = [0u8; 20];
         let src_ip = Ipv4Addr::new(192, 168, 1, 1);
         let dest_ip = Ipv4Addr::new(192, 168, 1, 2);
-        TcpHeader::write_header(&mut data, 1234, 5678, 100, 200, TcpFlags::SYN | TcpFlags::ACK, src_ip, dest_ip, 0);
+        TcpHeader::write_header(
+            &mut data,
+            1234,
+            5678,
+            100,
+            200,
+            TcpFlags::SYN | TcpFlags::ACK,
+            src_ip,
+            dest_ip,
+            0,
+        );
 
         let tcp = TcpHeader::new(&data).unwrap();
         assert_eq!(tcp.src_port(), 1234);

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-# benchmark.py - Aether Stress Tester
+# benchmark.py - Isla Stress Tester
 
 import socket
 import time
@@ -11,6 +11,7 @@ import sys
 successful_reqs = 0
 failed_reqs = 0
 running = True
+
 
 def load_worker(target_ip, target_port):
     global successful_reqs, failed_reqs, running
@@ -28,20 +29,24 @@ def load_worker(target_ip, target_port):
             # Read until close
             while True:
                 data = s.recv(4096)
-                if not data: break
+                if not data:
+                    break
 
             s.close()
             successful_reqs += 1
         except:
             failed_reqs += 1
 
+
 def run_benchmark(ip, port, threads, duration):
     global running, successful_reqs, failed_reqs
 
-    print(f"[*] Benchmarking Aether at {ip}:{port}")
+    print(f"[*] Benchmarking Isla at {ip}:{port}")
     print(f"[*] Threads: {threads} | Duration: {duration}s")
     print("-" * 50)
-    print(f"{'Time':<10} | {'CPS (Conn/sec)':<15} | {'Total Success':<15} | {'Errors':<10}")
+    print(
+        f"{'Time':<10} | {'CPS (Conn/sec)':<15} | {'Total Success':<15} | {'Errors':<10}"
+    )
     print("-" * 50)
 
     # Spawn Workers
@@ -67,7 +72,9 @@ def run_benchmark(ip, port, threads, duration):
             delta = current_count - last_count
             cps = delta / elapsed
 
-            print(f"{int(current_time - start_time):<10} | {cps:<15.1f} | {current_count:<15} | {failed_reqs:<10}")
+            print(
+                f"{int(current_time - start_time):<10} | {cps:<15.1f} | {current_count:<15} | {failed_reqs:<10}"
+            )
 
             last_count = current_count
             last_check = current_time
@@ -80,6 +87,7 @@ def run_benchmark(ip, port, threads, duration):
     total_time = time.time() - start_time
     print(f"[*] Final Score: {successful_reqs / total_time:.2f} Connections/Sec")
     print(f"[*] Total Transferred: {successful_reqs} requests")
+
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()

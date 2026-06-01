@@ -69,19 +69,19 @@ impl<'a> Ipv4Packet<'a> {
         payload_len: usize,
     ) {
         buf[0] = 0x45; // Version 4, IHL 5 (20 bytes)
-        buf[1] = 0;    // DSCP/ECN
+        buf[1] = 0; // DSCP/ECN
         NetworkEndian::write_u16(&mut buf[2..4], (IPV4_HDR_LEN + payload_len) as u16);
         NetworkEndian::write_u16(&mut buf[4..6], 0); // Identification
         NetworkEndian::write_u16(&mut buf[6..8], 0x4000); // Flags: Don't Fragment
-        buf[8] = 64;   // TTL
+        buf[8] = 64; // TTL
         buf[9] = match protocol {
             IpProtocol::ICMP => 1,
             IpProtocol::TCP => 6,
             IpProtocol::UDP => 17,
             IpProtocol::Unknown(p) => p,
         };
-        buf[10] = 0;   // Checksum placeholder
-        buf[11] = 0;   // Checksum placeholder
+        buf[10] = 0; // Checksum placeholder
+        buf[11] = 0; // Checksum placeholder
         buf[12..16].copy_from_slice(&src_ip.octets());
         buf[16..20].copy_from_slice(&dest_ip.octets());
 

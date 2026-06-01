@@ -16,15 +16,19 @@ DNS_PORT = 53
 STRESS_THREADS = 100
 MTU_TEST_SIZE = 4096  # Larger than one packet to force segmentation
 
+
 def print_header(name):
     print("\n" + "=" * 60)
     print(f"[*] TEST: {name}")
     print("=" * 60)
 
+
 def generate_random_string(length):
-    return ''.join(random.choices(string.ascii_letters + string.digits, k=length))
+    return "".join(random.choices(string.ascii_letters + string.digits, k=length))
+
 
 # --- TCP TESTS ---
+
 
 def test_echo_integrity(ip, port):
     print_header("TCP DATA INTEGRITY & BOUNDARIES")
@@ -43,7 +47,9 @@ def test_echo_integrity(ip, port):
             client.settimeout(2.0)
             client.connect((ip, port))
 
-            print(f"    [>] Case '{name}' ({len(payload)} bytes)... ", end="", flush=True)
+            print(
+                f"    [>] Case '{name}' ({len(payload)} bytes)... ", end="", flush=True
+            )
 
             # Send data
             client.sendall(payload.encode())
@@ -55,11 +61,14 @@ def test_echo_integrity(ip, port):
             while True:
                 try:
                     chunk = client.recv(4096)
-                    if not chunk: break
+                    if not chunk:
+                        break
                     received += chunk
 
                     # Heuristic: If we have enough data, stop
-                    if len(received) >= len(payload) + 20: # +20 for protocol overhead "Aether Echo..."
+                    if (
+                        len(received) >= len(payload) + 20
+                    ):  # +20 for protocol overhead "Isla Echo..."
                         break
 
                 except socket.timeout:
@@ -68,11 +77,11 @@ def test_echo_integrity(ip, port):
                 if time.time() - start_wait > 5.0:
                     break
 
-            decoded = received.decode(errors='ignore')
+            decoded = received.decode(errors="ignore")
             client.close()
 
             # Strip Protocol Wrappers
-            cleaned = decoded.replace("Aether Echo: ", "").replace("> ", "")
+            cleaned = decoded.replace("Isla Echo: ", "").replace("> ", "")
 
             # Verification
             if payload in cleaned:
@@ -89,6 +98,7 @@ def test_echo_integrity(ip, port):
 
     return all_passed
 
+
 def test_http_compliance(ip, port):
     print_header("HTTP PROTOCOL COMPLIANCE")
     try:
@@ -97,22 +107,23 @@ def test_http_compliance(ip, port):
         client.settimeout(2.0)
         client.connect((ip, port))
 
-        request = "GET /index.html HTTP/1.1\r\nHost: aether.local\r\n\r\n"
+        request = "GET /index.html HTTP/1.1\r\nHost: isla.local\r\n\r\n"
         client.sendall(request.encode())
 
         response = b""
         while True:
             try:
                 chunk = client.recv(1024)
-                if not chunk: break
+                if not chunk:
+                    break
                 response += chunk
             except socket.timeout:
                 break
 
         client.close()
-        decoded = response.decode(errors='ignore')
+        decoded = response.decode(errors="ignore")
 
-        if "HTTP/1.1 200 OK" in decoded and "Project Aether" in decoded:
+        if "HTTP/1.1 200 OK" in decoded and "Project Isla" in decoded:
             print("PASS")
             return True
         else:
@@ -123,7 +134,9 @@ def test_http_compliance(ip, port):
         print(f"ERROR: {e}")
         return False
 
+
 # --- UDP TESTS ---
+
 
 def test_udp_dns(ip):
     print_header("UDP / DNS COMPLIANCE")
@@ -155,7 +168,9 @@ def test_udp_dns(ip):
         print(f"ERROR: {e}")
         return False
 
+
 # --- STRESS TESTS ---
+
 
 def stress_worker(ip, port, results, index):
     try:
@@ -168,6 +183,7 @@ def stress_worker(ip, port, results, index):
         results[index] = True
     except:
         results[index] = False
+
 
 def test_concurrent_stress(ip, port):
     print_header(f"CONCURRENCY STRESS ({STRESS_THREADS} Threads)")
@@ -190,7 +206,9 @@ def test_concurrent_stress(ip, port):
     duration = time.time() - start_time
     success = sum(results)
 
-    print(f"    [+] Success Rate: {success}/{STRESS_THREADS} ({success/STRESS_THREADS*100:.1f}%)")
+    print(
+        f"    [+] Success Rate: {success}/{STRESS_THREADS} ({success / STRESS_THREADS * 100:.1f}%)"
+    )
     print(f"    [+] Time Taken:   {duration:.2f}s")
 
     if success >= STRESS_THREADS * 0.90:
@@ -200,6 +218,7 @@ def test_concurrent_stress(ip, port):
         print("\n[✘] CONCURRENCY TEST FAILED (Packet Loss High)")
         return False
 
+
 # --- MAIN ---
 
 if __name__ == "__main__":
@@ -208,7 +227,7 @@ if __name__ == "__main__":
     parser.add_argument("--port", type=int, default=DEFAULT_PORT)
     args = parser.parse_args()
 
-    print(f"[*] Target Aether Stack: {args.ip}")
+    print(f"[*] Target Isla Stack: {args.ip}")
 
     # 1. Integrity
     if not test_echo_integrity(args.ip, args.port):

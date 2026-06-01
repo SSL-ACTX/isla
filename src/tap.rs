@@ -1,8 +1,8 @@
 // src/tap.rs
+use nix::libc;
 use std::fs::File;
 use std::io::{Read, Write};
 use std::os::unix::io::AsRawFd;
-use nix::libc;
 
 #[derive(Debug)]
 pub enum TapError {
@@ -20,10 +20,10 @@ impl TapDevice {
     pub fn new(name: &str) -> Result<Self, TapError> {
         // Open the character device for cloning network interfaces
         let file = File::options()
-        .read(true)
-        .write(true)
-        .open("/dev/net/tun")
-        .map_err(TapError::Io)?;
+            .read(true)
+            .write(true)
+            .open("/dev/net/tun")
+            .map_err(TapError::Io)?;
 
         let fd = file.as_raw_fd();
 
@@ -33,7 +33,11 @@ impl TapDevice {
         let ifr_name = name.as_bytes();
         let len = std::cmp::min(ifr_name.len(), libc::IFNAMSIZ - 1);
         unsafe {
-            std::ptr::copy_nonoverlapping(ifr_name.as_ptr(), ifr.ifr_name.as_mut_ptr() as *mut u8, len);
+            std::ptr::copy_nonoverlapping(
+                ifr_name.as_ptr(),
+                ifr.ifr_name.as_mut_ptr() as *mut u8,
+                len,
+            );
             ifr.ifr_ifru.ifru_flags = (libc::IFF_TAP | libc::IFF_NO_PI) as i16;
         }
 
@@ -46,8 +50,8 @@ impl TapDevice {
 
         let actual_name = unsafe {
             std::ffi::CStr::from_ptr(ifr.ifr_name.as_ptr())
-            .to_string_lossy()
-            .into_owned()
+                .to_string_lossy()
+                .into_owned()
         };
 
         Ok(TapDevice {

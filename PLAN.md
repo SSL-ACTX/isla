@@ -1,4 +1,4 @@
-# Project Aether: A High-Performance User-Space TCP/IP Stack
+# Project Isla: A High-Performance User-Space TCP/IP Stack
 
 **Objective:** To bypass the Linux kernel's networking stack by implementing a custom Layer 2-4 protocol suite in Rust, utilizing a TAP interface to process raw Ethernet frames.
 
@@ -23,7 +23,7 @@
 
 Before you can process data, you need to trick your OS into sending raw Ethernet frames to your Rust program instead of the Kernel.
 
-1.  **TAP Interface Setup:** Write a Rust module that uses `ioctl` to open `/dev/net/tun` and create a persistent `TAP` device (e.g., `aether0`).
+1.  **TAP Interface Setup:** Write a Rust module that uses `ioctl` to open `/dev/net/tun` and create a persistent `TAP` device (e.g., `isla0`).
 2.  **The Main Loop:** Create a high-performance loop that reads from the TAP file descriptor into a pre-allocated `[u8; 1514]` buffer (the standard MTU).
 3.  **Frame Parsing:**
     - Identify the **Ethernet Header** (Destination MAC, Source MAC, EtherType).
@@ -76,7 +76,7 @@ TCP is "Reliable." If a packet is lost, you must re-send it. This is the hardest
 Now make it fast enough to rival the Kernel.
 
 1.  **Buffer Management:** Instead of copying bytes from the TAP buffer to the TCP buffer to the Application buffer, use **Ownership**. Use `Bytes` or `Arc<[u8]>` to pass data through the stack without copying.
-2.  **Async/Await Integration:** Wrap your stack in a `Future` so users can write `aether_socket.read().await`.
+2.  **Async/Await Integration:** Wrap your stack in a `Future` so users can write `isla_socket.read().await`.
 3.  **The "Web Server" Test:** Serve a small static file over your stack.
     - **The Final Boss:** Point Firefox at `http://192.168.1.2/hello.html`. Firefox is aggressive—it will open multiple connections and request headers. If your stack doesn't crash, you've won.
 
@@ -89,17 +89,17 @@ To run a user-space stack, you need to give your binary permission to touch the 
 1.  **Create the TAP device:**
 
     ```bash
-    sudo ip tuntap add mode tap name aether0
-    sudo ip addr add 192.168.1.1/24 dev aether0
-    sudo ip link set dev aether0 up
+    sudo ip tuntap add mode tap name isla0
+    sudo ip addr add 192.168.1.1/24 dev isla0
+    sudo ip link set dev isla0 up
     ```
 
 2.  **Rust Permissions:**
     After building your binary, give it the capability to open raw sockets:
 
     ```bash
-    sudo setcap cap_net_admin,cap_net_raw+eip ./target/debug/aether
+    sudo setcap cap_net_admin,cap_net_raw+eip ./target/debug/isla
     ```
 
 3.  **The "Wireshark" Setup:**
-    Open Wireshark and listen on the `aether0` interface. You will see exactly what your Rust code is doing in real-time.
+    Open Wireshark and listen on the `isla0` interface. You will see exactly what your Rust code is doing in real-time.
